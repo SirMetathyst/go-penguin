@@ -17,17 +17,16 @@ type ExecuteTemplate interface {
 }
 
 // HTML writes a string to the response, setting the Content-Type as text/template.
-func HTML(w http.ResponseWriter, r *http.Request, status int, name string, v any) {
+func HTML(w http.ResponseWriter, r *http.Request, status int, name string, v any) error {
 	if renderer := HTMLEngineFromCtx(r.Context()); renderer != nil {
 		var buf bytes.Buffer
 		if err := renderer.ExecuteTemplate(&buf, name, v); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			return err
 		}
-		w.Header().Set("Content-Type", "text/template; charset=utf-8")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(status)
 		_, _ = buf.WriteTo(w)
-		return
+		return nil
 	}
 	panic("penguin: template renderer not assigned")
 }
@@ -35,11 +34,10 @@ func HTML(w http.ResponseWriter, r *http.Request, status int, name string, v any
 // XML marshals 'v' to JSON, setting the Content-Type as application/xml. It
 // will automatically prepend a generic XML header (see encoding/xml.Header) if
 // one is not found in the first 100 bytes of 'v'.
-func XML(w http.ResponseWriter, r *http.Request, status int, v any) {
+func XML(w http.ResponseWriter, r *http.Request, status int, v any) error {
 	b, err := xml.Marshal(v)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
@@ -56,6 +54,7 @@ func XML(w http.ResponseWriter, r *http.Request, status int, v any) {
 	}
 
 	_, _ = w.Write(b)
+	return nil
 }
 
 // NoContent returns a HTTP 204 "No Content" response.
@@ -73,32 +72,32 @@ func Text(w http.ResponseWriter, r *http.Request, status int, v string) {
 
 // JSON marshals 'v' to JSON, automatically escaping HTML and setting the
 // Content-Type as application/json.
-func JSON(w http.ResponseWriter, r *http.Request, status int, v any) {
+func JSON(w http.ResponseWriter, r *http.Request, status int, v any) error {
 	buf := &bytes.Buffer{}
 	enc := json.NewEncoder(buf)
 	enc.SetEscapeHTML(true)
 	if err := enc.Encode(v); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_, _ = w.Write(buf.Bytes())
+	return nil
 }
 
 // PureJSON marshals 'v' to JSON, setting the
 // Content-Type as application/json and without escaping HTML
-func PureJSON(w http.ResponseWriter, r *http.Request, status int, v any) {
+func PureJSON(w http.ResponseWriter, r *http.Request, status int, v any) error {
 	buf := &bytes.Buffer{}
 	enc := json.NewEncoder(buf)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_, _ = w.Write(buf.Bytes())
+	return nil
 }
 
 // Data writes raw bytes to the response, setting the Content-Type as
