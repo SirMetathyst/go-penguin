@@ -106,6 +106,17 @@ func (mx *Engine) Use(middlewares ...func(http.Handler) http.Handler) {
 	mx.middlewares = append(mx.middlewares, middlewares...)
 }
 
+// HTML takes an ExecuteTemplate interface to handle execution of templates.
+func (mx *Engine) HTML(handler ExecuteTemplate) {
+	mx.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			rctx := RouteContext(r.Context())
+			rctx.HTMLEngine = handler
+			next.ServeHTTP(w, r)
+		})
+	})
+}
+
 // HTMLGlob parses the template definitions in the files identified by the patterns and calls Engine.Use
 // with middleware that injects the templates for use by HTML. If the templates fail to parse the method will panic.
 func (mx *Engine) HTMLGlob(patterns ...string) {
@@ -146,43 +157,7 @@ func (mx *Engine) HTMLGlobReloadable(reload bool, patterns ...string) {
 	})
 }
 
-// HTML creates a new Template and parses the template definitions from the named files.
-// The returned template's name will have the (base) name and (parsed) contents of the first file and
-// will be injected into each request for use by HTML. If the templates fail to parse the method will panic.
-func (mx *Engine) HTML(files ...string) {
-	tmpl := template.Must(template.ParseFiles(files...))
-	mx.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			rctx := RouteContext(r.Context())
-			rctx.HTMLEngine = tmpl
-			next.ServeHTTP(w, r)
-		})
-	})
-}
-
-// HTMLReloadable creates a new Template and parses the template definitions from the named files.
-// The returned template's name will have the (base) name and (parsed) contents of the first file and
-// will be injected into each request for use by HTML. The templates will be reloaded and parsed on each
-// request when reload is set to true. If the templates fail to parse the method will panic.
-func (mx *Engine) HTMLReloadable(reload bool, files ...string) {
-	var tmpl *template.Template
-	loadFn := func() {
-		tmpl = template.Must(template.ParseFiles(files...))
-	}
-	loadFn()
-	mx.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if reload {
-				loadFn()
-			}
-			rctx := RouteContext(r.Context())
-			rctx.HTMLEngine = tmpl
-			next.ServeHTTP(w, r)
-		})
-	})
-}
-
-// HTMLFs is like Engine.HTML or Engine.HTMLGlob but reads from the file system fs instead of the host operating system's file system.
+// HTMLFs is like Engine.HTMLGlob but reads from the file system fs instead of the host operating system's file system.
 // It accepts a list of glob patterns (Note that most file names serve as glob patterns matching only themselves.) and
 // will be injected into each request for use by HTML. If the templates fail to parse the method will panic.
 func (mx *Engine) HTMLFs(fs fs.FS, patterns ...string) {
@@ -196,7 +171,18 @@ func (mx *Engine) HTMLFs(fs fs.FS, patterns ...string) {
 	})
 }
 
-// HTMLFsReloadable is like Engine.HTML or Engine.HTMLGlob but reads from the file system fs instead of the host operating system's file system.
+// Static adds a handler using http.FileSystem that serves HTTP requests with the contents of the file system rooted at rootPath.
+func (mx *Engine) Static(rootPath string) {
+	mx.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir(rootPath))))
+}
+
+// StaticFS adds a handler using http.FileSystem that serves HTTP requests with the contents of the file system rooted at rootPath.
+// fs is converted to a FileSystem implementation, for use with the FileServer.
+func (mx *Engine) StaticFS(fs fs.FS) {
+	mx.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(fs))))
+}
+
+// HTMLFsReloadable is like Engine.HTMLGlob but reads from the file system fs instead of the host operating system's file system.
 // It accepts a list of glob patterns (Note that most file names serve as glob patterns matching only themselves.) and
 // will be injected into each request for use by HTML. The templates will be reloaded and parsed on each
 // request when reload is set to true. If the templates fail to parse the method will panic.
@@ -216,29 +202,6 @@ func (mx *Engine) HTMLFsReloadable(reload bool, fs fs.FS, patterns ...string) {
 			next.ServeHTTP(w, r)
 		})
 	})
-}
-
-// HTMLGlobFS will call Engine.HTMLFs if useFS is true or Engine.HTMLGlob if it isn't.
-// It accepts a list of glob patterns (Note that most file names serve as glob patterns matching only themselves.) and
-// will be injected into each request for use by HTML. If the templates fail to parse the method will panic.
-func (mx *Engine) HTMLGlobFS(useFS bool, fs fs.FS, patterns ...string) {
-	if useFS {
-		mx.HTMLFs(fs, patterns...)
-	} else {
-		mx.HTMLGlob(patterns...)
-	}
-}
-
-// HTMLGlobFsReloadable will call Engine.HTMLFsReloadable if useFS is true or Engine.HTMLGlobReloadable if it isn't
-// and pass through the reload boolean. if reload is true then the templates will be parsed again for every request.
-// It accepts a list of glob patterns (Note that most file names serve as glob patterns matching only themselves.) and
-// will be injected into each request for use by HTML. If the templates fail to parse the method will panic.
-func (mx *Engine) HTMLGlobFsReloadable(reload bool, useFS bool, fs fs.FS, patterns ...string) {
-	if useFS {
-		mx.HTMLFsReloadable(reload, fs, patterns...)
-	} else {
-		mx.HTMLGlobReloadable(reload, patterns...)
-	}
 }
 
 // Handle adds the route `pattern` that matches any http method to

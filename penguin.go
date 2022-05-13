@@ -123,6 +123,9 @@ type Router interface {
 	// and makes it clearer that a controller is being used at a glance.
 	Controller(pattern string, c Controller)
 
+	// HTML takes an ExecuteTemplate interface to handle execution of templates.
+	HTML(handler ExecuteTemplate)
+
 	// HTMLGlob parses the template definitions in the files identified by the patterns and calls Engine.Use
 	// with middleware that injects the templates for use by HTML. If the templates fail to parse the method will panic.
 	HTMLGlob(pattern ...string)
@@ -130,18 +133,7 @@ type Router interface {
 	// HTMLGlobReloadable parses the template definitions in the files identified by the patterns and calls Engine.Use
 	// with middleware that injects the templates for use by HTML but will reload and parse the templates with each
 	// request if reload is set to true. If the templates fail to parse the method will panic.
-	HTMLGlobReloadable(refresh bool, pattern ...string)
-
-	// HTML creates a new Template and parses the template definitions from the named files.
-	// The returned template's name will have the (base) name and (parsed) contents of the first file and
-	// will be injected into each request for use by HTML. If the templates fail to parse the method will panic.
-	HTML(files ...string)
-
-	// HTMLReloadable creates a new Template and parses the template definitions from the named files.
-	// The returned template's name will have the (base) name and (parsed) contents of the first file and
-	// will be injected into each request for use by HTML. The templates will be reloaded and parsed on each
-	// request when reload is set to true. If the templates fail to parse the method will panic.
-	HTMLReloadable(refresh bool, files ...string)
+	HTMLGlobReloadable(reload bool, pattern ...string)
 
 	// HTMLFs is like Engine.HTML or Engine.HTMLGlob but reads from the file system fs instead of the host operating system's file system.
 	// It accepts a list of glob patterns (Note that most file names serve as glob patterns matching only themselves.) and
@@ -152,18 +144,14 @@ type Router interface {
 	// It accepts a list of glob patterns (Note that most file names serve as glob patterns matching only themselves.) and
 	// will be injected into each request for use by HTML. The templates will be reloaded and parsed on each
 	// request when reload is set to true. If the templates fail to parse the method will panic.
-	HTMLFsReloadable(refresh bool, fs fs.FS, patterns ...string)
+	HTMLFsReloadable(reload bool, fs fs.FS, patterns ...string)
 
-	// HTMLGlobFS will call Engine.HTMLFs if useFS is true or Engine.HTMLGlob if it isn't.
-	// It accepts a list of glob patterns (Note that most file names serve as glob patterns matching only themselves.) and
-	// will be injected into each request for use by HTML. If the templates fail to parse the method will panic.
-	HTMLGlobFS(useFS bool, fs fs.FS, patterns ...string)
+	// Static adds a handler using http.FileSystem that serves HTTP requests with the contents of the file system rooted at rootPath.
+	Static(rootPath string)
 
-	// HTMLGlobFsReloadable will call Engine.HTMLFsReloadable if useFS is true or Engine.HTMLGlobReloadable if it isn't
-	// and pass through the reload boolean. if reload is true then the templates will be parsed again for every request.
-	// It accepts a list of glob patterns (Note that most file names serve as glob patterns matching only themselves.) and
-	// will be injected into each request for use by HTML. If the templates fail to parse the method will panic.
-	HTMLGlobFsReloadable(reload bool, useFS bool, fs fs.FS, patterns ...string)
+	// StaticFS adds a handler using http.FileSystem that serves HTTP requests with the contents of the file system rooted at rootPath.
+	// fs is converted to a FileSystem implementation, for use with the FileServer.
+	StaticFS(fs fs.FS)
 }
 
 // Routes interface adds two methods for router traversal, which is also
